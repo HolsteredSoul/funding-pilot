@@ -1,0 +1,9 @@
+{% if dry_run %}
+<span class="badge badge-yellow">DRY RUN</span>
+{% endif %}
+{% if circuit_breaker %}
+<span class="badge badge-red">CIRCUIT BREAK</span>
+{% else %}
+<span class="pulse{% if not ws_connected %} pulse-red{% endif %}"></span>
+<span class="text-muted">{{ "WS" if ws_connected else "REST" }}</span>
+{% endif %}

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<h1 class="section-title">Current Configuration</h1>
+<p class="text-muted" style="margin-bottom: 1.5rem;">
+    Read-only view of active settings. Change values in <code>.env</code> and restart the bot.
+</p>
+
+{% for section, items in settings_sections.items() %}
+<h2 class="section-title">{{ section }}</h2>
+<dl class="kv-grid">
+    {% for key, val in items.items() %}
+    <dt>{{ key }}</dt>
+    <dd>{{ val }}</dd>
+    {% endfor %}
+</dl>
+{% endfor %}
+{% endblock %}

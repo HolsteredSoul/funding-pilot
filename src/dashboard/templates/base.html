@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Dashboard{% endblock %} — AU-Funding-Arb</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <nav>
+        <div class="container">
+            <span class="nav-brand">&#9670; AU-Funding-Arb</span>
+            <ul class="nav-links">
+                <li><a href="/" {% if active_page == "index" %}class="active"{% endif %}>Dashboard</a></li>
+                <li><a href="/positions" {% if active_page == "positions" %}class="active"{% endif %}>Positions</a></li>
+                <li><a href="/trades" {% if active_page == "trades" %}class="active"{% endif %}>Trades</a></li>
+                <li><a href="/scanner" {% if active_page == "scanner" %}class="active"{% endif %}>Scanner</a></li>
+                <li><a href="/settings" {% if active_page == "settings" %}class="active"{% endif %}>Settings</a></li>
+            </ul>
+            <div class="nav-status"
+                 hx-ext="sse"
+                 sse-connect="/api/sse"
+                 sse-swap="status_badge"
+                 hx-swap="innerHTML">
+                {% include "partials/_status_badge.html" %}
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer>
+        <div class="container">
+            AU-Funding-Arb v1.0 &middot; Read-only dashboard &middot;
+            <span class="text-muted">AWST (UTC+8)</span>
+        </div>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

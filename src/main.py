@@ -31,8 +31,10 @@ import structlog
 
 from src.arb_engine import ArbEngine
 from src.config import Settings
+from src.dashboard.app import run_dashboard
+from src.dashboard.sse import EventBus
 from src.exchange_client import ExchangeClient
-from src.models import HedgePosition
+from src.models import DashboardState, HedgePosition
 from src.order_executor import OrderExecutor
 from src.position_manager import PositionManager
 from src.tax_logger import RbaRateCache, TaxLogger
@@ -69,6 +71,8 @@ async def funding_scanner_loop(
     telegram: TelegramAlerter,
     settings: Settings,
     shutdown: asyncio.Event,
+    dash_state: DashboardState | None = None,
+    event_bus: EventBus | None = None,
 ) -> None:
     """Scan for funding opportunities and open new hedges."""
     log.info("loop_started", loop="funding_scanner", interval_min=settings.scan_interval_min)
@@ -92,6 +96,14 @@ async def funding_scanner_loop(
 
             # Scan for opportunities
             opportunities = await engine.scan_funding_opportunities()
+
+            # Publish scan results to dashboard
+            if dash_state is not None:
+                dash_state.last_scan_results = opportunities
+                dash_state.last_scan_time = datetime.now(timezone.utc)
+                dash_state.loop_status["scanner"] = "ok"
+            if event_bus is not None:
+                await event_bus.publish("portfolio_update", _build_portfolio_event(pos_mgr, settings, dash_state))
 
             for opp in opportunities:
                 if shutdown.is_set():
@@ -171,6 +183,8 @@ async def health_monitor_loop(
     telegram: TelegramAlerter,
     settings: Settings,
     shutdown: asyncio.Event,
+    dash_state: DashboardState | None = None,
+    event_bus: EventBus | None = None,
 ) -> None:
     """Monitor position health via WebSocket (REST fallback)."""
     log.info("loop_started", loop="health_monitor", interval_s=settings.health_interval_s)
@@ -240,14 +254,28 @@ async def health_monitor_loop(
 
                 # Circuit breaker
                 if await engine.should_circuit_break():
+                    if dash_state is not None:
+                        dash_state.circuit_breaker_active = True
                     await telegram.send_circuit_breaker_alert(pos_mgr.portfolio)
                     if not settings.dry_run:
                         for pos in list(pos_mgr.positions.values()):
                             await executor.emergency_unwind(pos)
                             await pos_mgr.remove_position(pos.pair_id)
 
+            # Publish health update to dashboard
+            if dash_state is not None:
+                dash_state.loop_status["health"] = "ok"
+                dash_state.ws_connected = not client.ws_is_stale
+            if event_bus is not None:
+                await event_bus.publish("portfolio_update", _build_portfolio_event(pos_mgr, settings, dash_state))
+                await event_bus.publish("positions_update", {
+                    "html": True,  # HTMX swap trigger
+                })
+
         except Exception:
             log.exception("health_monitor_error")
+            if dash_state is not None:
+                dash_state.loop_status["health"] = "error"
 
         try:
             await asyncio.wait_for(
@@ -357,6 +385,28 @@ async def settlement_evaluator_loop(
         await _sleep_until_next_settlement(shutdown)
 
 
+def _build_portfolio_event(
+    pos_mgr: PositionManager,
+    settings: Settings,
+    dash_state: DashboardState | None,
+) -> dict[str, Any]:
+    """Build the SSE payload dict for a portfolio_update event."""
+    p = pos_mgr.portfolio
+    dd = pos_mgr.drawdown_pct() * 100
+    return {
+        "equity": p.total_equity_usd,
+        "peak_equity": p.peak_equity_usd,
+        "drawdown": round(dd, 2),
+        "open_count": pos_mgr.open_count,
+        "max_pairs": settings.max_concurrent_pairs,
+        "total_funding": p.total_funding_collected_usd,
+        "realised_pnl": p.total_realised_pnl_usd,
+        "dry_run": settings.dry_run,
+        "circuit_breaker": dash_state.circuit_breaker_active if dash_state else False,
+        "ws_connected": dash_state.ws_connected if dash_state else False,
+    }
+
+
 async def _sleep_until_next_settlement(shutdown: asyncio.Event) -> None:
     """Sleep until the next 8h funding settlement (00:00, 08:00, 16:00 UTC)."""
     now = datetime.now(timezone.utc)
@@ -453,6 +503,10 @@ async def run() -> None:
     engine = ArbEngine(settings, client, pos_mgr)
     executor = OrderExecutor(settings, client)
 
+    # Dashboard state (shared with web UI)
+    dash_state = DashboardState(bot_start_time=datetime.now(timezone.utc))
+    event_bus = EventBus()
+
     shutdown = asyncio.Event()
 
     # ── SIGTERM / SIGINT Handler ────────────────────────────────────
@@ -488,20 +542,30 @@ async def run() -> None:
             len(resumed), pos_mgr.portfolio.total_equity_usd
         )
 
-        # ── Run all loops concurrently ──────────────────────────────
-        await asyncio.gather(
+        # ── Build task list ───────────────────────────────────────
+        tasks = [
             funding_scanner_loop(
-                engine, executor, pos_mgr, tax, telegram, settings, shutdown
+                engine, executor, pos_mgr, tax, telegram, settings, shutdown,
+                dash_state=dash_state, event_bus=event_bus,
             ),
             health_monitor_loop(
-                client, pos_mgr, engine, executor, telegram, settings, shutdown
+                client, pos_mgr, engine, executor, telegram, settings, shutdown,
+                dash_state=dash_state, event_bus=event_bus,
             ),
             settlement_evaluator_loop(
                 engine, executor, pos_mgr, tax, telegram, settings, shutdown
             ),
             daily_recap_loop(telegram, pos_mgr, settings, shutdown),
-            return_exceptions=True,
-        )
+        ]
+
+        # Dashboard (optional — runs uvicorn inside the event loop)
+        if settings.dashboard_enabled:
+            tasks.append(
+                run_dashboard(settings, pos_mgr, dash_state, event_bus, shutdown)
+            )
+
+        # ── Run all loops concurrently ──────────────────────────────
+        await asyncio.gather(*tasks, return_exceptions=True)
 
     finally:
         # ── Graceful Shutdown ───────────────────────────────────────

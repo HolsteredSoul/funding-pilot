@@ -1,0 +1,323 @@
+/* ═══════════════════════════════════════════════════════════════════
+   AU-Funding-Arb — Dark Trading Terminal Theme
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+    --bg-primary:   #0d1117;
+    --bg-secondary: #161b22;
+    --bg-card:      #1c2128;
+    --bg-hover:     #252c35;
+    --border:       #30363d;
+    --text-primary: #e6edf3;
+    --text-muted:   #8b949e;
+    --accent-green: #3fb950;
+    --accent-red:   #f85149;
+    --accent-blue:  #58a6ff;
+    --accent-yellow:#d29922;
+    --accent-purple:#bc8cff;
+    --font-mono:    "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+    --font-sans:    -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    --radius:       8px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { font-size: 14px; }
+
+body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+    min-height: 100vh;
+}
+
+a { color: var(--accent-blue); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Layout ────────────────────────────────────────────────────────── */
+
+.container {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+}
+
+/* ── Navigation ────────────────────────────────────────────────────── */
+
+nav {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    padding: 0.75rem 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+nav .container {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+}
+
+.nav-brand {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--accent-green);
+    white-space: nowrap;
+}
+
+.nav-links {
+    display: flex;
+    gap: 1.25rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.nav-links a {
+    color: var(--text-muted);
+    font-size: 0.92rem;
+    padding: 0.25rem 0;
+    transition: color 0.15s;
+}
+
+.nav-links a:hover,
+.nav-links a.active {
+    color: var(--text-primary);
+    text-decoration: none;
+}
+
+.nav-status {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.85rem;
+}
+
+/* ── Cards ─────────────────────────────────────────────────────────── */
+
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+}
+
+.card-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.4rem;
+}
+
+.card-value {
+    font-family: var(--font-mono);
+    font-size: 1.6rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.card-sub {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.3rem;
+}
+
+/* ── Tables ────────────────────────────────────────────────────────── */
+
+.table-wrap {
+    overflow-x: auto;
+    margin: 1.5rem 0;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+th {
+    text-align: left;
+    padding: 0.6rem 0.75rem;
+    border-bottom: 2px solid var(--border);
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+td {
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+tr:hover { background: var(--bg-hover); }
+
+/* ── Badges ────────────────────────────────────────────────────────── */
+
+.badge {
+    display: inline-block;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.badge-green  { background: rgba(63,185,80,0.15);  color: var(--accent-green); }
+.badge-red    { background: rgba(248,81,73,0.15);   color: var(--accent-red); }
+.badge-yellow { background: rgba(210,153,34,0.15);  color: var(--accent-yellow); }
+.badge-blue   { background: rgba(88,166,255,0.15);  color: var(--accent-blue); }
+.badge-purple { background: rgba(188,140,255,0.15); color: var(--accent-purple); }
+
+/* ── Colour utilities ──────────────────────────────────────────────── */
+
+.text-green  { color: var(--accent-green); }
+.text-red    { color: var(--accent-red); }
+.text-yellow { color: var(--accent-yellow); }
+.text-blue   { color: var(--accent-blue); }
+.text-muted  { color: var(--text-muted); }
+.text-mono   { font-family: var(--font-mono); }
+
+/* ── Section headings ──────────────────────────────────────────────── */
+
+.section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 2rem 0 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+/* ── Settings key-value ────────────────────────────────────────────── */
+
+.kv-grid {
+    display: grid;
+    grid-template-columns: minmax(200px, 1fr) 2fr;
+    gap: 0;
+}
+
+.kv-grid dt {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.kv-grid dd {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    margin: 0;
+}
+
+/* ── Chart container ───────────────────────────────────────────────── */
+
+.chart-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin: 1.5rem 0;
+    position: relative;
+    height: 280px;
+}
+
+/* ── Footer ────────────────────────────────────────────────────────── */
+
+footer {
+    margin-top: 3rem;
+    padding: 1.5rem 0;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* ── Responsive ────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+    html { font-size: 13px; }
+    .card-grid { grid-template-columns: repeat(2, 1fr); }
+    nav .container { flex-wrap: wrap; gap: 0.5rem; }
+    .nav-status { margin-left: 0; width: 100%; justify-content: flex-end; }
+    .kv-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+    .card-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Pulse animation for live indicator ────────────────────────────── */
+
+.pulse {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    animation: pulse-anim 2s ease-in-out infinite;
+}
+
+.pulse-red { background: var(--accent-red); }
+
+@keyframes pulse-anim {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.4; }
+}
+
+/* ── Empty state ───────────────────────────────────────────────────── */
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+}
+
+.empty-state p {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+/* ── Pagination ────────────────────────────────────────────────────── */
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin: 1.5rem 0;
+}
+
+.pagination a,
+.pagination span {
+    padding: 0.4rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+}
+
+.pagination span {
+    background: var(--accent-blue);
+    color: #fff;
+    border-color: var(--accent-blue);
+}

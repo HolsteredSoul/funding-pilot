@@ -1,0 +1,35 @@
+<div class="card-grid">
+    <div class="card">
+        <div class="card-label">Total Equity</div>
+        <div class="card-value {% if equity > 0 %}text-green{% endif %}">
+            ${{ "%.2f"|format(equity) }}
+        </div>
+        <div class="card-sub">USD</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Drawdown</div>
+        <div class="card-value {% if drawdown > 3 %}text-red{% elif drawdown > 1 %}text-yellow{% else %}text-green{% endif %}">
+            {{ "%.2f"|format(drawdown) }}%
+        </div>
+        <div class="card-sub">from peak ${{ "%.2f"|format(peak_equity) }}</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Active Pairs</div>
+        <div class="card-value text-blue">{{ open_count }}</div>
+        <div class="card-sub">of {{ max_pairs }} slots</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Funding Collected</div>
+        <div class="card-value text-green">
+            ${{ "%.4f"|format(total_funding) }}
+        </div>
+        <div class="card-sub">cumulative</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Realised P&amp;L</div>
+        <div class="card-value {% if realised_pnl >= 0 %}text-green{% else %}text-red{% endif %}">
+            ${{ "%.4f"|format(realised_pnl) }}
+        </div>
+        <div class="card-sub">USD</div>
+    </div>
+</div>

@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<h1 class="section-title">Portfolio Overview</h1>
+
+<!-- Live-updating equity cards via SSE -->
+<div id="equity-cards"
+     hx-ext="sse"
+     sse-connect="/api/sse"
+     sse-swap="portfolio_update"
+     hx-swap="innerHTML">
+    {% include "partials/_equity_card.html" %}
+</div>
+
+<!-- Equity chart -->
+<h2 class="section-title">Equity History</h2>
+<div class="chart-container">
+    <canvas id="equityChart"></canvas>
+</div>
+
+<!-- Live-updating positions table via SSE -->
+<h2 class="section-title">Active Positions</h2>
+<div id="positions-table"
+     hx-ext="sse"
+     sse-connect="/api/sse"
+     sse-swap="positions_update"
+     hx-swap="innerHTML">
+    {% include "partials/_positions_table.html" %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    const ctx = document.getElementById('equityChart');
+    if (!ctx) return;
+
+    const chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: {{ equity_timestamps | tojson }},
+            datasets: [{
+                label: 'Equity (USD)',
+                data: {{ equity_values | tojson }},
+                borderColor: '#3fb950',
+                backgroundColor: 'rgba(63,185,80,0.08)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 0,
+                borderWidth: 2,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+            },
+            scales: {
+                x: {
+                    grid: { color: '#30363d' },
+                    ticks: { color: '#8b949e', maxTicksLimit: 8 },
+                },
+                y: {
+                    grid: { color: '#30363d' },
+                    ticks: { color: '#8b949e' },
+                },
+            },
+        },
+    });
+
+    // Update chart when SSE pushes new equity data
+    const evtSource = new EventSource('/api/sse');
+    evtSource.addEventListener('equity_history', function(e) {
+        try {
+            const d = JSON.parse(e.data);
+            chart.data.labels = d.timestamps;
+            chart.data.datasets[0].data = d.values;
+            chart.update('none');
+        } catch(err) { /* ignore parse errors */ }
+    });
+})();
+</script>
+{% endblock %}

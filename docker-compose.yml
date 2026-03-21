@@ -10,6 +10,8 @@ services:
     env_file: .env
     volumes:
       - ./data:/app/data
+    ports:
+      - "${ARB_DASHBOARD_PORT:-8080}:8080"
     stop_signal: SIGTERM
     stop_grace_period: 60s
     logging:

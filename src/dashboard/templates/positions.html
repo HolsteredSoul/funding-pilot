@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Positions{% endblock %}
+
+{% block content %}
+<h1 class="section-title">Position Details</h1>
+
+{% if positions %}
+{% for pos in positions %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h3 style="margin: 0; font-family: var(--font-mono);">{{ pos.pair_id }}</h3>
+        {% if pos.status == "open" %}
+        <span class="badge badge-green">OPEN</span>
+        {% elif pos.status == "closing" %}
+        <span class="badge badge-yellow">CLOSING</span>
+        {% endif %}
+    </div>
+
+    <div class="card-grid" style="margin: 0;">
+        <div class="card" style="border: none; padding: 0.75rem;">
+            <div class="card-label">Notional</div>
+            <div class="card-value" style="font-size: 1.2rem;">${{ "%.2f"|format(pos.notional_usd) }}</div>
+        </div>
+        <div class="card" style="border: none; padding: 0.75rem;">
+            <div class="card-label">Cumulative Funding</div>
+            <div class="card-value {% if pos.cumulative_funding >= 0 %}text-green{% else %}text-red{% endif %}" style="font-size: 1.2rem;">
+                ${{ "%.6f"|format(pos.cumulative_funding) }}
+            </div>
+        </div>
+        <div class="card" style="border: none; padding: 0.75rem;">
+            <div class="card-label">P&amp;L</div>
+            <div class="card-value {% if pos.cumulative_pnl_usd >= 0 %}text-green{% else %}text-red{% endif %}" style="font-size: 1.2rem;">
+                ${{ "%.4f"|format(pos.cumulative_pnl_usd) }}
+            </div>
+        </div>
+        <div class="card" style="border: none; padding: 0.75rem;">
+            <div class="card-label">Hold Duration</div>
+            <div class="card-value text-blue" style="font-size: 1.2rem;">{{ pos.hold_duration }}</div>
+        </div>
+    </div>
+
+    <!-- Funding history -->
+    {% if pos.funding_history %}
+    <h4 style="margin: 1rem 0 0.5rem; color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase;">Funding Payments</h4>
+    <div class="table-wrap">
+    <table>
+        <thead>
+            <tr><th>Time (UTC)</th><th>Rate</th><th>Amount</th></tr>
+        </thead>
+        <tbody>
+        {% for fp in pos.funding_history[-10:] %}
+            <tr>
+                <td>{{ fp.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>{{ "%.4f"|format(fp.rate * 100) }}%</td>
+                <td class="{% if fp.amount_usd >= 0 %}text-green{% else %}text-red{% endif %}">
+                    ${{ "%.6f"|format(fp.amount_usd) }}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% endif %}
+</div>
+{% endfor %}
+{% else %}
+<div class="empty-state">
+    <p>No active positions</p>
+</div>
+{% endif %}
+{% endblock %}

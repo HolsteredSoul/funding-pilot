@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Scanner{% endblock %}
+
+{% block content %}
+<h1 class="section-title">Funding Scanner Results</h1>
+
+{% if last_scan_time %}
+<p class="text-muted" style="margin-bottom: 1rem;">
+    Last scan: <strong>{{ last_scan_time }}</strong> &middot;
+    {{ scan_results|length }} opportunities found
+</p>
+{% else %}
+<p class="text-muted" style="margin-bottom: 1rem;">No scan has run yet.</p>
+{% endif %}
+
+{% if scan_results %}
+<div class="table-wrap">
+<table>
+    <thead>
+        <tr>
+            <th>Pair</th>
+            <th>Current Rate</th>
+            <th>Trailing Avg</th>
+            <th>Net Profit</th>
+            <th>Mark Price</th>
+            <th>Next Settlement</th>
+            <th>Interval</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for opp in scan_results %}
+        <tr>
+            <td>{{ opp.pair_id }}</td>
+            <td class="text-green">{{ "%.4f"|format(opp.current_rate * 100) }}%</td>
+            <td>{{ "%.4f"|format(opp.trailing_avg * 100) }}%</td>
+            <td class="{% if opp.net_profit > 0 %}text-green{% else %}text-red{% endif %}">
+                {{ "%.4f"|format(opp.net_profit * 100) }}%
+            </td>
+            <td>${{ "%.2f"|format(opp.mark_price) }}</td>
+            <td>{{ opp.next_settlement.strftime('%H:%M UTC') if opp.next_settlement else '—' }}</td>
+            <td>{{ opp.settlement_interval_h }}h</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+{% else %}
+<div class="empty-state">
+    <p>No opportunities above threshold</p>
+    <p class="text-muted">Minimum current funding: {{ "%.2f"|format(min_funding * 100) }}%</p>
+</div>
+{% endif %}
+{% endblock %}

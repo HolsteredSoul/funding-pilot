@@ -1,0 +1,51 @@
+{% if positions %}
+<div class="table-wrap">
+<table>
+    <thead>
+        <tr>
+            <th>Pair</th>
+            <th>Entry Time (AWST)</th>
+            <th>Notional</th>
+            <th>Spot Entry</th>
+            <th>Perp Entry</th>
+            <th>Funding</th>
+            <th>PnL</th>
+            <th>Hold</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for pos in positions %}
+        <tr>
+            <td>{{ pos.pair_id }}</td>
+            <td>{{ pos.entry_time_awst }}</td>
+            <td>${{ "%.2f"|format(pos.notional_usd) }}</td>
+            <td>${{ "%.4f"|format(pos.spot_entry_price) }}</td>
+            <td>${{ "%.4f"|format(pos.perp_entry_price) }}</td>
+            <td class="{% if pos.cumulative_funding >= 0 %}text-green{% else %}text-red{% endif %}">
+                ${{ "%.6f"|format(pos.cumulative_funding) }}
+            </td>
+            <td class="{% if pos.cumulative_pnl_usd >= 0 %}text-green{% else %}text-red{% endif %}">
+                ${{ "%.4f"|format(pos.cumulative_pnl_usd) }}
+            </td>
+            <td class="text-muted">{{ pos.hold_duration }}</td>
+            <td>
+                {% if pos.status == "open" %}
+                <span class="badge badge-green">OPEN</span>
+                {% elif pos.status == "closing" %}
+                <span class="badge badge-yellow">CLOSING</span>
+                {% else %}
+                <span class="badge badge-red">{{ pos.status|upper }}</span>
+                {% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+{% else %}
+<div class="empty-state">
+    <p>No active positions</p>
+    <p class="text-muted">The scanner will open hedges when profitable opportunities appear.</p>
+</div>
+{% endif %}

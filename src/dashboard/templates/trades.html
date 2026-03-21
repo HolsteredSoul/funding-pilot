@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Trade History{% endblock %}
+
+{% block content %}
+<h1 class="section-title">Trade History (AUD)</h1>
+
+{% if trades %}
+<div class="table-wrap">
+<table>
+    <thead>
+        <tr>
+            <th>Time (AWST)</th>
+            <th>Pair</th>
+            <th>Side</th>
+            <th>Type</th>
+            <th>Amount USD</th>
+            <th>RBA Rate</th>
+            <th>AUD Value</th>
+            <th>Fee AUD</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for t in trades %}
+        <tr>
+            <td>{{ t.awst_timestamp }}</td>
+            <td>{{ t.pair }}</td>
+            <td>
+                {% if t.side == "buy" %}
+                <span class="text-green">BUY</span>
+                {% else %}
+                <span class="text-red">SELL</span>
+                {% endif %}
+            </td>
+            <td><span class="badge badge-{% if t.tx_type == 'open' %}blue{% elif t.tx_type == 'close' %}purple{% elif t.tx_type == 'funding' %}green{% else %}yellow{% endif %}">{{ t.tx_type }}</span></td>
+            <td>${{ t.amount_usd }}</td>
+            <td>{{ t.rba_aud_rate }}</td>
+            <td>A${{ t.aud_value }}</td>
+            <td>A${{ t.fee_aud }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+
+<!-- Pagination -->
+{% if total_pages > 1 %}
+<div class="pagination">
+    {% if page > 1 %}
+    <a href="/trades?page={{ page - 1 }}">&#8592; Prev</a>
+    {% endif %}
+    {% for p in range(1, total_pages + 1) %}
+        {% if p == page %}
+        <span>{{ p }}</span>
+        {% elif p <= 3 or p >= total_pages - 2 or (p >= page - 1 and p <= page + 1) %}
+        <a href="/trades?page={{ p }}">{{ p }}</a>
+        {% elif p == 4 or p == total_pages - 3 %}
+        <a href="#">&hellip;</a>
+        {% endif %}
+    {% endfor %}
+    {% if page < total_pages %}
+    <a href="/trades?page={{ page + 1 }}">Next &#8594;</a>
+    {% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="empty-state">
+    <p>No trades recorded yet</p>
+    <p class="text-muted">Trades will appear here once the bot opens its first hedge.</p>
+</div>
+{% endif %}
+{% endblock %}

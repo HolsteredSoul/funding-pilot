@@ -5,3 +5,7 @@ structlog>=24.0
 aiohttp>=3.9
 pandas>=2.0
 pybit>=5.8.0
+fastapi>=0.115
+uvicorn[standard]>=0.34
+jinja2>=3.1
+sse-starlette>=2.0

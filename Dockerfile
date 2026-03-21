@@ -27,9 +27,12 @@ USER arb
 # ── Data volume (positions.json, trades_aud.csv, rba_rates.csv) ────
 VOLUME /app/data
 
-# ── Health check ────────────────────────────────────────────────────
+# ── Dashboard port ─────────────────────────────────────────────────
+EXPOSE 8080
+
+# ── Health check (uses dashboard /health endpoint when enabled) ────
 HEALTHCHECK --interval=60s --timeout=10s --retries=3 \
-    CMD python -c "import sys; sys.exit(0)"
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')" || python -c "import sys; sys.exit(0)"
 
 # ── Entry point ─────────────────────────────────────────────────────
 ENTRYPOINT ["python", "-m", "src.main"]

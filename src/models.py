@@ -82,3 +82,18 @@ class PortfolioState(BaseModel):
     total_realised_pnl_usd: float = 0.0
     total_funding_collected_usd: float = 0.0
     last_updated: datetime = Field(default_factory=datetime.utcnow)
+
+
+class DashboardState(BaseModel):
+    """Mutable state bag shared between async loops and the web dashboard."""
+
+    last_scan_results: list[FundingSnapshot] = Field(default_factory=list)
+    last_scan_time: Optional[datetime] = None
+    loop_status: dict[str, str] = Field(default_factory=lambda: {
+        "scanner": "idle",
+        "health": "idle",
+        "settlement": "idle",
+    })
+    circuit_breaker_active: bool = False
+    ws_connected: bool = False
+    bot_start_time: Optional[datetime] = None

@@ -71,6 +71,11 @@ class Settings(BaseSettings):
     telegram_chat_id: str = ""
     daily_recap_hour_awst: int = 7  # 7 am AWST
 
+    # ── Dashboard ─────────────────────────────────────────────────────
+    dashboard_enabled: bool = True
+    dashboard_port: int = 8080
+    dashboard_host: str = "0.0.0.0"
+
     # ── Locale ──────────────────────────────────────────────────────────
     timezone: str = "Australia/Perth"  # AWST = UTC+8
 
