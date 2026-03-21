@@ -1,0 +1,23 @@
+[Unit]
+Description=AU-Funding-Arb — Delta-Neutral Funding Rate Arbitrage Bot
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/funding-arb
+ExecStart=/usr/bin/docker compose up --build
+ExecStop=/usr/bin/docker compose down
+Restart=on-failure
+RestartSec=30
+KillSignal=SIGTERM
+TimeoutStopSec=60
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=funding-arb
+
+[Install]
+WantedBy=multi-user.target
