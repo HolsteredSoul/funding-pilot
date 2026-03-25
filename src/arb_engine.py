@@ -114,6 +114,8 @@ class ArbEngine:
             return []
 
         for sym, data in candidates:
+            if not await self._is_liquid_enough(sym):
+                continue
             snapshot = await self._build_snapshot(sym, data)
             if snapshot is None:
                 continue
@@ -216,6 +218,35 @@ class ArbEngine:
         gross = trailing_avg * adjusted_periods
         fees = self._s.round_trip_maker_fee
         return gross - fees
+
+    async def _is_liquid_enough(self, symbol: str) -> bool:
+        """Hard liquidity floor: $10M 24h volume and $5M open interest.
+
+        Prevents entering illiquid pairs where slippage and wide spreads
+        would eat into the funding edge. No fancy vol-adjustment — just
+        a hard floor until we have real data to calibrate against.
+        """
+        try:
+            ticker = await self._client.fetch_ticker(symbol)
+            vol_24h = float(ticker.get("quoteVolume", 0) or 0)
+            oi = float(ticker.get("openInterest", 0) or 0)
+            # Some exchanges nest OI in the info dict
+            if oi == 0:
+                oi = float(
+                    ticker.get("info", {}).get("openInterest", 0) or 0
+                )
+            if vol_24h < 10_000_000 or oi < 5_000_000:
+                log.debug(
+                    "scanner_skipped_illiquid",
+                    symbol=symbol,
+                    vol_24h=f"{vol_24h:,.0f}",
+                    oi=f"{oi:,.0f}",
+                )
+                return False
+            return True
+        except Exception:
+            log.warning("liquidity_check_failed", symbol=symbol)
+            return False
 
     # ═══════════════════════════════════════════════════════════════════
     # LOOP 3 — Settlement / Exit Evaluator (every 8h aligned)
