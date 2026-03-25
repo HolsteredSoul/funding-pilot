@@ -167,14 +167,21 @@ class PositionManager:
             exchange_positions = await client.fetch_positions()
             exchange_symbols = {p["symbol"] for p in exchange_positions}
 
+            stale_pairs: list[str] = []
             for pair_id, local_pos in list(self.positions.items()):
                 if local_pos.perp_symbol not in exchange_symbols:
                     log.warning(
-                        "reconcile_mismatch_local_only",
+                        "reconcile_removed_stale",
                         pair=pair_id,
                         perp=local_pos.perp_symbol,
-                        msg="Position in file but not on exchange — may have been manually closed",
+                        msg="Position in file but not on exchange — removing stale entry",
                     )
+                    stale_pairs.append(pair_id)
+
+            for pair_id in stale_pairs:
+                del self.positions[pair_id]
+            if stale_pairs:
+                self.portfolio.positions = list(self.positions.values())
 
             for ex_pos in exchange_positions:
                 sym = ex_pos["symbol"]

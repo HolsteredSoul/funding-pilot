@@ -12,6 +12,7 @@ The CSV contains AUD/USD (how many USD per 1 AUD). To convert:
 
 from __future__ import annotations
 
+import asyncio
 import csv
 import io
 from datetime import date, datetime, timezone
@@ -188,6 +189,19 @@ class RbaRateCache:
 
         return filled
 
+    async def start_daily_refresh_loop(self) -> None:
+        """Background task that refreshes RBA rates once per day.
+
+        Call as ``asyncio.create_task(rba.start_daily_refresh_loop())``.
+        """
+        while True:
+            try:
+                await self.refresh()
+            except Exception:
+                log.exception("rba_daily_refresh_error")
+            # Sleep until tomorrow (~24h)
+            await asyncio.sleep(86_400)
+
     async def get_rate(self, dt: datetime) -> float:
         """Get the AUD/USD rate for a given datetime.
 
@@ -200,11 +214,6 @@ class RbaRateCache:
         Returns:
             AUD/USD rate (e.g. 0.6500 means 1 AUD = 0.65 USD).
         """
-        # Refresh if we haven't today
-        today = date.today()
-        if self._last_refresh != today:
-            await self.refresh()
-
         # Convert to AWST date for lookup
         awst_dt = dt.astimezone(AWST)
         lookup_date = awst_dt.date()
@@ -234,12 +243,15 @@ class TaxLogger:
         self._data_dir = Path(settings.data_dir)
         self._data_dir.mkdir(parents=True, exist_ok=True)
         self._csv_path = self._data_dir / settings.trades_csv
+        self._dryrun_csv_path = self._data_dir / "trades_aud_dryrun.csv"
         self._ensure_csv_header()
+        self._ensure_csv_header(self._dryrun_csv_path)
 
-    def _ensure_csv_header(self) -> None:
+    def _ensure_csv_header(self, path: Path | None = None) -> None:
         """Create the CSV file with header if it doesn't exist."""
-        if not self._csv_path.exists():
-            with open(self._csv_path, "w", newline="") as f:
+        target = path or self._csv_path
+        if not target.exists():
+            with open(target, "w", newline="") as f:
                 writer = csv.writer(f)
                 writer.writerow(TRADES_CSV_HEADER)
 
@@ -252,6 +264,7 @@ class TaxLogger:
         fee_usd: float,
         tx_type: str,
         pnl_usd: Optional[float] = None,
+        dry_run: bool = False,
     ) -> TradeRecord:
         """Log a single trade event with AUD conversion.
 
@@ -297,7 +310,7 @@ class TaxLogger:
             pnl_aud=pnl_aud,
         )
 
-        self._append_to_csv(record)
+        self._append_to_csv(record, dry_run=dry_run)
         log.info(
             "trade_logged",
             pair=pair,
@@ -307,9 +320,10 @@ class TaxLogger:
         )
         return record
 
-    def _append_to_csv(self, record: TradeRecord) -> None:
+    def _append_to_csv(self, record: TradeRecord, dry_run: bool = False) -> None:
         """Append a single record to the CSV file."""
-        with open(self._csv_path, "a", newline="") as f:
+        target = self._dryrun_csv_path if dry_run else self._csv_path
+        with open(target, "a", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(
                 [

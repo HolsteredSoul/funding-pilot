@@ -135,6 +135,15 @@ class ExchangeClient:
         """Fetch top-of-book orderbook for a symbol."""
         return await self._exchange.fetch_order_book(symbol, limit=limit)
 
+    async def fetch_ohlcv(
+        self, symbol: str, timeframe: str = "8h", limit: int = 90
+    ) -> list[list]:
+        """Fetch OHLCV candles for a symbol.
+
+        Returns list of [timestamp, open, high, low, close, volume].
+        """
+        return await self._exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
+
     async def fetch_mark_price(self, symbol: str) -> float:
         """Fetch the current mark price for a perp."""
         ticker = await self.fetch_ticker(symbol)

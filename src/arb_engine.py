@@ -35,6 +35,41 @@ class ArbEngine:
         # Rolling basis stats cache: symbol → list of basis values
         self._basis_history: dict[str, list[float]] = {}
 
+    async def preload_basis_history(self) -> None:
+        """Pre-seed basis history from 30-day OHLCV data for all open positions.
+
+        Without this, basis divergence protection is blind for the first
+        ~3 days of operation (needs ≥10 data points at 8h intervals).
+        """
+        symbols = [pos.perp_symbol for pos in self._pos_mgr.positions.values()]
+        if not symbols:
+            log.info("basis_preload_skip_no_positions")
+            return
+
+        loaded = 0
+        for symbol in symbols:
+            try:
+                ohlcv = await self._client.fetch_ohlcv(symbol, "8h", limit=90)
+                if not ohlcv:
+                    continue
+                # Fetch current ticker to get index price for basis calc
+                ticker = await self._client.fetch_ticker(symbol)
+                index = float(ticker.get("index", 0) or ticker.get("last", 0))
+                if index <= 0:
+                    continue
+                # Use close price from each candle as proxy for mark price
+                basis_values = []
+                for candle in ohlcv:
+                    close = float(candle[4])  # OHLCV: [ts, o, h, l, c, vol]
+                    basis = (close - index) / index
+                    basis_values.append(basis)
+                self._basis_history[symbol] = basis_values[-90:]
+                loaded += 1
+            except Exception:
+                log.warning("basis_preload_failed", symbol=symbol)
+
+        log.info("basis_history_preloaded", symbols_loaded=loaded, total=len(symbols))
+
     # ═══════════════════════════════════════════════════════════════════
     # LOOP 1 — Funding Scanner (every 60 min)
     # ═══════════════════════════════════════════════════════════════════

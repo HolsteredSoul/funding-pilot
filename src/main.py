@@ -121,7 +121,7 @@ async def funding_scanner_loop(
                         funding_rate=f"{opp.current_rate:.4%}",
                         net_profit=f"{opp.net_profit:.4%}",
                     )
-                    # Log to tax CSV even in dry run for testing
+                    # Log to separate dry-run CSV for testing
                     await tax.log_trade(
                         pair=opp.pair_id,
                         side="buy",
@@ -129,6 +129,7 @@ async def funding_scanner_loop(
                         price_usd=opp.mark_price,
                         fee_usd=0,
                         tx_type="open",
+                        dry_run=True,
                     )
                     continue
 
@@ -308,6 +309,16 @@ async def settlement_evaluator_loop(
 
     while not shutdown.is_set():
         try:
+            # Circuit breaker check (mirrors scanner + health loops)
+            if await engine.should_circuit_break():
+                await telegram.send_circuit_breaker_alert(pos_mgr.portfolio)
+                if not settings.dry_run:
+                    for pos in list(pos_mgr.positions.values()):
+                        await executor.emergency_unwind(pos)
+                        await pos_mgr.remove_position(pos.pair_id)
+                await _sleep_until_next_settlement(shutdown)
+                continue
+
             positions = list(pos_mgr.positions.values())
 
             if positions:
@@ -425,7 +436,7 @@ async def _sleep_until_next_settlement(shutdown: asyncio.Event) -> None:
     if next_hour is None:
         next_hour = settlement_hours[0]  # wrap to tomorrow 00:00
 
-    target = now.replace(hour=next_hour, minute=1, second=0, microsecond=0)
+    target = now.replace(hour=next_hour, minute=0, second=0, microsecond=0)
     if target <= now:
         target += timedelta(days=1)
 
@@ -534,6 +545,12 @@ async def run() -> None:
         if resumed:
             log.info("resuming_positions", count=len(resumed))
             await pos_mgr.reconcile_with_exchange(client)
+
+        # Pre-seed basis divergence history (avoids blind 3-day window)
+        await engine.preload_basis_history()
+
+        # Background daily RBA rate refresh (keeps it off the trade-logging path)
+        asyncio.create_task(rba.start_daily_refresh_loop())
 
         # Fetch initial equity
         try:
