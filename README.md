@@ -67,14 +67,15 @@ All settings are in `.env` with `ARB_` prefix. Key parameters:
 | `ARB_TESTNET` | `false` | Use exchange sandbox |
 | `ARB_POSITION_SIZE_USD` | `1000` | USD per hedge pair |
 | `ARB_MAX_CONCURRENT_PAIRS` | `5` | Max simultaneous hedges |
-| `ARB_MIN_CURRENT_FUNDING` | `0.0002` | Min 0.02% to enter |
-| `ARB_FUNDING_FLOOR` | `0.0001` | Exit below 0.01% |
+| `ARB_MIN_CURRENT_FUNDING` | `0.0003` | Min 0.03% to enter |
+| `ARB_FUNDING_FLOOR` | `0.0` | Exit below 0% (cheaper to sit than churn) |
+| `ARB_MIN_HOLD_PERIODS` | `21` | 7 days (21×8h) before floor exit applies |
 | `ARB_HARD_STOP_LOSS_PCT` | `-0.02` | -2% stop loss |
 | `ARB_CIRCUIT_BREAKER_PCT` | `0.05` | 5% drawdown halts all |
 
 See `.env.example` for the complete list.
 
-## Maker Fee Strategy
+## Execution & Fee Strategy
 
 The bot prefers **limit orders** (maker fees) over market orders:
 
@@ -85,6 +86,20 @@ The bot prefers **limit orders** (maker fees) over market orders:
 - **Round-trip cost** (4 legs at maker): ~0.24%
 
 At 0.03% funding per 8h and 8 expected holding periods, gross return is 0.24% — matching the fees. The bot only enters when `(trailing_avg × periods) - fees > 0`.
+
+### Taker Fee Tracking
+
+When limit orders fail and the bot falls back to market (taker) orders, the actual fill type is tracked on each position. Tax logging uses the correct fee rate (maker or taker) so `trades_aud.csv` accurately reflects costs — preventing overstated profit and incorrect ATO tax liability.
+
+### Anti-Churn Protection
+
+Frequent entries and exits ("churning") destroy profitability because round-trip fees (0.24%-0.45%) can exceed funding income on short holds. The bot defends against this with:
+
+1. **Higher entry threshold** (0.03%): only enters when funding justifies the execution drag
+2. **Zero exit floor** (0.0%): it's cheaper to sit in a stagnant position than to pay 0.15% to exit and 0.15% to re-enter elsewhere
+3. **Minimum hold period** (21 epochs / 7 days): the funding decay exit cannot fire until the position has had enough runway to pay off its own execution costs
+
+Safety exits (hard stop loss, circuit breaker, 24h negative funding streak) are **never gated** — they always fire regardless of hold time.
 
 ## Dry Run Mode
 
@@ -178,9 +193,25 @@ python -m backtest.backtest
 # Custom parameters
 python -m backtest.backtest --min-funding 0.0003 --holding-periods 6 --position-size 500
 
+# Adjust exit behaviour
+python -m backtest.backtest --funding-floor 0.0001 --min-hold-periods 10
+
+# Stress test with taker fees and slippage (realistic worst-case)
+python -m backtest.backtest --taker-pct 0.5 --slippage 0.0005
+
 # Custom data directory
 python -m backtest.backtest --data-dir path/to/csvs --pairs BTC ETH DOGE
 ```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--min-funding` | `0.0003` | Min funding rate to enter (0.03%) |
+| `--funding-floor` | `0.0` | Exit when trailing avg falls below this |
+| `--min-hold-periods` | `21` | Min 8h periods before floor exit applies |
+| `--holding-periods` | `8` | Expected holding periods for entry calc |
+| `--position-size` | `1000` | USD per position |
+| `--taker-pct` | `0.0` | Fraction of legs assumed to fill as taker (0.0-1.0) |
+| `--slippage` | `0.0` | Additional slippage per taker leg |
 
 Sample data in `backtest/data/` contains realistic synthetic 8h funding rates. For real historical data, use [CoinGlass](https://www.coinglass.com/) (note: free tier has rate limits).
 
