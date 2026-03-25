@@ -43,6 +43,7 @@ class HedgePosition(BaseModel):
     funding_history: list[FundingPayment] = Field(default_factory=list)
     negative_funding_since: Optional[datetime] = None  # tracks 24h negative streak
     status: str = "open"  # open | closing | closed
+    fill_type: str = "maker"  # maker | taker — actual execution type
 
 
 class FundingPayment(BaseModel):

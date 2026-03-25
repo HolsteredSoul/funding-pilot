@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     cross_exchange_mode: bool = False  # disabled by default
 
     # ── Strategy — entry ────────────────────────────────────────────────
-    min_current_funding: float = 0.0002  # 0.02 %
+    min_current_funding: float = 0.0003  # 0.03 %
     min_profitable_cycles: int = 3  # trailing avg window
     expected_holding_periods: int = 8  # how many settlements we expect to hold
     max_concurrent_pairs: int = 5
@@ -37,7 +37,8 @@ class Settings(BaseSettings):
     max_portfolio_pct: float = 0.02  # 2 % of portfolio per pair
 
     # ── Strategy — exit ─────────────────────────────────────────────────
-    funding_floor: float = 0.0001  # 0.01 %
+    funding_floor: float = 0.0  # 0 % — cheaper to sit than churn
+    min_hold_periods: int = 21  # 7 days × 3 settlements/day before floor exit applies
     basis_divergence_sigma: float = 3.0
     hard_stop_loss_pct: float = -0.02  # -2 %
     funding_negative_hours: int = 24

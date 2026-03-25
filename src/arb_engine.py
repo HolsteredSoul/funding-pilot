@@ -234,8 +234,8 @@ class ArbEngine:
         except Exception:
             log.warning("basis_check_failed", pair=pos.pair_id)
 
-        # 4. Funding decay: trailing 3-period avg < floor
-        if len(pos.funding_history) >= 3:
+        # 4. Funding decay: trailing 3-period avg < floor (only after min hold)
+        if len(pos.funding_history) >= max(3, self._s.min_hold_periods):
             recent_rates = [f.rate for f in pos.funding_history[-3:]]
             trailing_avg = statistics.mean(recent_rates)
             if trailing_avg < self._s.funding_floor:

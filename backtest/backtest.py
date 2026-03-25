@@ -7,6 +7,7 @@ Usage:
     python -m backtest.backtest
     python -m backtest.backtest --data-dir backtest/data --pairs BTC ETH SOL
     python -m backtest.backtest --min-funding 0.0003 --holding-periods 6
+    python -m backtest.backtest --taker-pct 0.5 --slippage 0.0005
 
 The sample CSVs in backtest/data/ contain 30 days of 8h funding rates
 for BTC, ETH, and SOL perps (realistic synthetic data based on typical
@@ -29,19 +30,47 @@ import pandas as pd
 class BacktestConfig:
     """Backtest parameters mirroring the live bot's Settings."""
 
-    min_current_funding: float = 0.0002  # 0.02%
+    min_current_funding: float = 0.0003  # 0.03%
     min_profitable_cycles: int = 3
     expected_holding_periods: int = 8
-    funding_floor: float = 0.0001  # 0.01%
+    funding_floor: float = 0.0  # 0% — cheaper to sit than churn
+    min_hold_periods: int = 21  # 7 days × 3 settlements/day
     hard_stop_loss_pct: float = -0.02
     spot_maker_fee: float = 0.001
+    spot_taker_fee: float = 0.001
     perp_maker_fee: float = 0.0002
+    perp_taker_fee: float = 0.00055
+    taker_fill_pct: float = 0.0  # fraction of legs assumed taker (0.0–1.0)
+    slippage_pct: float = 0.0  # additional slippage per taker leg
     position_size_usd: float = 1000.0
     max_concurrent_pairs: int = 5
 
     @property
     def round_trip_fee(self) -> float:
-        return 2 * self.spot_maker_fee + 2 * self.perp_maker_fee
+        maker_pct = 1 - self.taker_fill_pct
+        spot = (
+            maker_pct * self.spot_maker_fee
+            + self.taker_fill_pct * (self.spot_taker_fee + self.slippage_pct)
+        )
+        perp = (
+            maker_pct * self.perp_maker_fee
+            + self.taker_fill_pct * (self.perp_taker_fee + self.slippage_pct)
+        )
+        return 2 * spot + 2 * perp
+
+    @property
+    def one_way_fee(self) -> float:
+        """Fee for opening OR closing (2 legs)."""
+        maker_pct = 1 - self.taker_fill_pct
+        spot = (
+            maker_pct * self.spot_maker_fee
+            + self.taker_fill_pct * (self.spot_taker_fee + self.slippage_pct)
+        )
+        perp = (
+            maker_pct * self.perp_maker_fee
+            + self.taker_fill_pct * (self.perp_taker_fee + self.slippage_pct)
+        )
+        return spot + perp
 
 
 @dataclass
@@ -106,7 +135,7 @@ def run_backtest(
     Simulates:
         - Scanning at each 8h interval
         - Entering when funding is profitable (trailing avg check)
-        - Exiting on funding decay or floor breach
+        - Exiting on funding decay or floor breach (after min hold)
         - Tracking fees, funding income, and net PnL
     """
     if pairs is None:
@@ -163,8 +192,11 @@ def run_backtest(
                 should_exit = False
                 reason = ""
 
-                # Funding decay
-                if len(trailing_window) >= 3:
+                # Funding decay (only after minimum hold period)
+                if (
+                    trade.periods_held >= config.min_hold_periods
+                    and len(trailing_window) >= 3
+                ):
                     trailing_avg = sum(trailing_window[-3:]) / 3
                     if trailing_avg < config.funding_floor:
                         should_exit = True
@@ -182,10 +214,8 @@ def run_backtest(
                 if should_exit:
                     trade.exit_time = ts
                     trade.exit_reason = reason
-                    # Close fees (2 legs × maker)
-                    trade.total_fees += trade.notional_usd * (
-                        config.spot_maker_fee + config.perp_maker_fee
-                    )
+                    # Close fees (2 legs, blended)
+                    trade.total_fees += trade.notional_usd * config.one_way_fee
                     result.trades.append(trade)
                     result.total_funding += trade.cumulative_funding
                     result.total_fees += trade.total_fees
@@ -204,10 +234,8 @@ def run_backtest(
                 ) - config.round_trip_fee
 
                 if net > 0 and len(open_trades) < config.max_concurrent_pairs:
-                    # Enter trade
-                    open_fee = config.position_size_usd * (
-                        config.spot_maker_fee + config.perp_maker_fee
-                    )
+                    # Enter trade — open fees (2 legs, blended)
+                    open_fee = config.position_size_usd * config.one_way_fee
                     trade = BacktestTrade(
                         pair=pair_name,
                         entry_time=ts,
@@ -221,9 +249,7 @@ def run_backtest(
     for pair_name, trade in open_trades.items():
         trade.exit_time = end
         trade.exit_reason = "backtest_end"
-        trade.total_fees += trade.notional_usd * (
-            config.spot_maker_fee + config.perp_maker_fee
-        )
+        trade.total_fees += trade.notional_usd * config.one_way_fee
         result.trades.append(trade)
         result.total_funding += trade.cumulative_funding
         result.total_fees += trade.total_fees
@@ -232,7 +258,7 @@ def run_backtest(
     return result
 
 
-def print_results(result: BacktestResult) -> None:
+def print_results(result: BacktestResult, config: BacktestConfig) -> None:
     """Pretty-print backtest results."""
     print(f"\n{'=' * 60}")
     print(f"  AU-Funding-Arb — Backtest Results ({result.days} days)")
@@ -243,6 +269,14 @@ def print_results(result: BacktestResult) -> None:
     print(f"  Total fees:              ${result.total_fees:>12,.4f}")
     print(f"  Net PnL:                 ${result.net_pnl:>12,.4f}")
     print(f"  Annualised return:       {result.annualised_return:>12.2%}")
+    print(f"{'=' * 60}")
+    print(f"  Round-trip fee (blended): {config.round_trip_fee:.4%}")
+    if config.taker_fill_pct > 0:
+        print(f"  Taker fill assumption:    {config.taker_fill_pct:.0%}")
+        print(f"  Slippage per taker leg:   {config.slippage_pct:.4%}")
+    print(f"  Min hold periods:         {config.min_hold_periods} ({config.min_hold_periods * 8 / 24:.0f} days)")
+    print(f"  Entry threshold:          {config.min_current_funding:.4%}")
+    print(f"  Exit floor:               {config.funding_floor:.4%}")
     print(f"{'=' * 60}")
 
     if result.trades:
@@ -281,8 +315,20 @@ def main() -> None:
     parser.add_argument(
         "--min-funding",
         type=float,
-        default=0.0002,
-        help="Minimum current funding rate (default 0.0002 = 0.02%%)",
+        default=0.0003,
+        help="Minimum current funding rate (default 0.0003 = 0.03%%)",
+    )
+    parser.add_argument(
+        "--funding-floor",
+        type=float,
+        default=0.0,
+        help="Exit when trailing avg falls below this (default 0.0 = 0%%)",
+    )
+    parser.add_argument(
+        "--min-hold-periods",
+        type=int,
+        default=21,
+        help="Minimum 8h periods before funding-floor exit applies (default 21 = 7 days)",
     )
     parser.add_argument(
         "--holding-periods",
@@ -296,16 +342,32 @@ def main() -> None:
         default=1000.0,
         help="Position size USD (default 1000)",
     )
+    parser.add_argument(
+        "--taker-pct",
+        type=float,
+        default=0.0,
+        help="Fraction of legs assumed to fill as taker 0.0-1.0 (default 0.0)",
+    )
+    parser.add_argument(
+        "--slippage",
+        type=float,
+        default=0.0,
+        help="Additional slippage per taker leg (default 0.0)",
+    )
     args = parser.parse_args()
 
     config = BacktestConfig(
         min_current_funding=args.min_funding,
+        funding_floor=args.funding_floor,
+        min_hold_periods=args.min_hold_periods,
         expected_holding_periods=args.holding_periods,
         position_size_usd=args.position_size,
+        taker_fill_pct=args.taker_pct,
+        slippage_pct=args.slippage,
     )
 
     result = run_backtest(config, args.data_dir, args.pairs)
-    print_results(result)
+    print_results(result, config)
 
 
 if __name__ == "__main__":

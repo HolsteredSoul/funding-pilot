@@ -137,9 +137,11 @@ async def funding_scanner_loop(
                 if pos is not None:
                     await pos_mgr.add_position(pos)
 
-                    # Log both legs to tax CSV
-                    spot_fee = pos.spot_qty * pos.spot_entry_price * settings.spot_maker_fee
-                    perp_fee = pos.perp_qty * pos.perp_entry_price * settings.perp_maker_fee
+                    # Log both legs to tax CSV (use actual fill type fee)
+                    spot_fee_rate = settings.spot_taker_fee if pos.fill_type == "taker" else settings.spot_maker_fee
+                    perp_fee_rate = settings.perp_taker_fee if pos.fill_type == "taker" else settings.perp_maker_fee
+                    spot_fee = pos.spot_qty * pos.spot_entry_price * spot_fee_rate
+                    perp_fee = pos.perp_qty * pos.perp_entry_price * perp_fee_rate
 
                     await tax.log_trade(
                         pair=pos.pair_id,
@@ -323,9 +325,11 @@ async def settlement_evaluator_loop(
 
                     success = await executor.close_hedge(pos, reason)
                     if success:
-                        # Log close trades
-                        spot_fee = pos.spot_qty * pos.spot_entry_price * settings.spot_maker_fee
-                        perp_fee = pos.perp_qty * pos.perp_entry_price * settings.perp_maker_fee
+                        # Log close trades (use actual fill type fee)
+                        spot_fee_rate = settings.spot_taker_fee if pos.fill_type == "taker" else settings.spot_maker_fee
+                        perp_fee_rate = settings.perp_taker_fee if pos.fill_type == "taker" else settings.perp_maker_fee
+                        spot_fee = pos.spot_qty * pos.spot_entry_price * spot_fee_rate
+                        perp_fee = pos.perp_qty * pos.perp_entry_price * perp_fee_rate
 
                         await tax.log_trade(
                             pair=pos.pair_id,

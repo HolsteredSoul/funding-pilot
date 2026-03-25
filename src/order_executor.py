@@ -202,6 +202,7 @@ class OrderExecutor:
             perp_qty=float(perp_order.get("filled", perp_qty)),
             spot_order_id=spot_order["id"],
             perp_order_id=perp_order["id"],
+            fill_type="taker",
         )
         log.info("open_hedge_market_success", pair=pos.pair_id)
         return pos
@@ -259,6 +260,7 @@ class OrderExecutor:
         if isinstance(spot_order, Exception) or isinstance(perp_order, Exception):
             log.error("close_hedge_placement_failed", pair=position.pair_id)
             # Fallback to market
+            position.fill_type = "taker"
             return await self._market_close_hedge(position)
 
         spot_id = spot_order["id"]
@@ -280,6 +282,8 @@ class OrderExecutor:
             await self._safe_cancel(perp_id, perp_sym)
             await self._market_unwind(perp_sym, "buy", position.perp_qty)
 
+        if not spot_filled or not perp_filled:
+            position.fill_type = "taker"
         log.info("close_hedge_completed_with_market", pair=position.pair_id)
         return True
 
